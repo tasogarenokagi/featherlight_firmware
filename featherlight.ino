@@ -4,35 +4,35 @@
 #include <Adafruit_BNO055.h>
 #include <utility/imumaths.h>
 
-#define NEOPIXEL_PIN 6
+#define NEOPIXEL_PIN 10
 
-    const uint8_t s_numPixels = 16;
+const uint8_t s_numPixels = 16;
 
 /**
  * Radial positions of the neopixels as unit quaternions.
  * This data is calculated from the PCB component placement output.
  *
- * Pixel 0 is to the left of the USB jack, and the numbering continues
+ * Pixel 0 is over the USB jack, and the numbering continues
  * clockwise around the ring.
  */
 const imu::Quaternion s_initialPixelPositions[s_numPixels] =
 {
-    imu::Quaternion(0.0, -0.98029486,  0.19753982, 0.0),
-    imu::Quaternion(0.0, -0.83320432,  0.55296525, 0.0),
-    imu::Quaternion(0.0, -0.55816974,  0.82972679, 0.0),
-    imu::Quaternion(0.0, -0.19815928,  0.98016983, 0.0),
-    imu::Quaternion(0.0,  0.19201967,  0.98139108, 0.0),
-    imu::Quaternion(0.0,  0.55296525,  0.83320432, 0.0),
-    imu::Quaternion(0.0,  0.82972679,  0.55816974, 0.0),
-    imu::Quaternion(0.0,  0.98016983,  0.19815928, 0.0),
-    imu::Quaternion(0.0,  0.98139108, -0.19201967, 0.0),
-    imu::Quaternion(0.0,  0.83320432, -0.55296525, 0.0),
-    imu::Quaternion(0.0,  0.55816974, -0.82972679, 0.0),
-    imu::Quaternion(0.0,  0.19815928, -0.98016983, 0.0),
-    imu::Quaternion(0.0, -0.19201967, -0.98139108, 0.0),
-    imu::Quaternion(0.0, -0.55296525, -0.83320432, 0.0),
-    imu::Quaternion(0.0, -0.82972679, -0.55816974, 0.0),
-    imu::Quaternion(0.0, -0.98029486, -0.19753982, 0.0)
+    imu::Quaternion(0.0, -1.00000000,  0.00000000, 0.0),
+    imu::Quaternion(0.0, -0.92387970,  0.38268302, 0.0),
+    imu::Quaternion(0.0, -0.70710678,  0.70710678, 0.0),
+    imu::Quaternion(0.0, -0.38268302,  0.92387970, 0.0),
+    imu::Quaternion(0.0,  0.00000000,  1.00000000, 0.0),
+    imu::Quaternion(0.0,  0.38315683,  0.92368330, 0.0),
+    imu::Quaternion(0.0,  0.70710678,  0.70710678, 0.0),
+    imu::Quaternion(0.0,  0.92387970,  0.38268302, 0.0),
+    imu::Quaternion(0.0,  1.00000000,  0.00000000, 0.0),
+    imu::Quaternion(0.0,  0.92387970, -0.38268302, 0.0),
+    imu::Quaternion(0.0,  0.70710678, -0.70710678, 0.0),
+    imu::Quaternion(0.0,  0.38268302, -0.92387970, 0.0),
+    imu::Quaternion(0.0,  0.00000000, -1.00000000, 0.0),
+    imu::Quaternion(0.0, -0.38268302, -0.92387970, 0.0),
+    imu::Quaternion(0.0, -0.70710678, -0.70710678, 0.0),
+    imu::Quaternion(0.0, -0.92387970, -0.38268302, 0.0)
 };
 
 imu::Quaternion g_currentPixelPositions[s_numPixels];
@@ -48,11 +48,11 @@ imu::Quaternion g_currentPixelPositions[s_numPixels];
 const imu::Quaternion g_initialRGBPositions[3] =
 {
     // Green
-    imu::Quaternion(0.0, 0.0,  255.0, 0.0),
+    imu::Quaternion(0.0, 0.0,  1.0, 0.0),
     // Red
-    imu::Quaternion(0.0, 0.0,  0.0, 255.0),
+    imu::Quaternion(0.0, 0.0,  0.0, 1.0),
     // Blue
-    imu::Quaternion(0.0, 255.0,  0.0, 0.0)
+    imu::Quaternion(0.0, 1.0,  0.0, 0.0)
 };
 
 /* Array index constants for the color primaries.
@@ -63,22 +63,41 @@ const uint8_t g_RED   = 1;
 const uint8_t g_BLUE  = 2;
 
 Adafruit_NeoPixel pixels = Adafruit_NeoPixel(s_numPixels, NEOPIXEL_PIN, NEO_GRB + NEO_KHZ800);
-Adafruit_BNO055 bno055 = Adafruit_BNO055(55);
+
+Adafruit_BNO055 bno28 = Adafruit_BNO055(-1, 0x28);
+Adafruit_BNO055 bno29 = Adafruit_BNO055(-1, 0x29);
+
+Adafruit_BNO055* bno055 = NULL;
 
 void setup()
 {
     Serial.begin(9600);
-    if(!bno055.begin())
-    {
-        Serial.print("Could not initialize IMU");
 
-        // FIXME need a red ring of death mode to indicate something going wrong.
-        while(1);
+  /* Initialise the sensor */
+  if(bno28.begin())
+  {
+    bno055 = &bno28;
+  }
+  else if(bno29.begin())
+  {
+    bno055 = &bno29;
+  }
+  else
+  {
+    /* There was a problem detecting the BNO055 ... check your connections */
+    SerialUSB.print("Ooops, no BNO055 detected ... Check your wiring or I2C ADDR!");
+    while(true)
+    {
+      digitalWrite(LED_BUILTIN, HIGH);
+      delay(250);
+      digitalWrite(LED_BUILTIN, LOW);
+      delay(250);
     }
+  }
 
     delay(1000);
 
-    bno055.setExtCrystalUse(true);
+    bno055->setExtCrystalUse(true);
 
     pixels.begin();
     pixels.setBrightness(16);
@@ -87,7 +106,7 @@ void setup()
 
 void loop()
 {
-    imu::Quaternion imuRotation = bno055.getQuat();
+    imu::Quaternion imuRotation = bno055->getQuat();
     imu::Quaternion imuConjugate = imuRotation.conjugate();
 
     /*
@@ -110,11 +129,12 @@ void loop()
         blueSubpixel = calculateSubpixel(g_currentPixelPositions[i], g_initialRGBPositions[g_BLUE]);
 
         pixels.setPixelColor(i, redSubpixel, greenSubpixel, blueSubpixel);
+//        pixels.setPixelColor(15-i, redSubpixel, greenSubpixel, blueSubpixel);
     }
 
-    debugQuaternion(imuRotation);
-    displayCalStatus();
-    Serial.println("");
+//    debugQuaternion(imuRotation);
+//    displayCalStatus();
+//    Serial.println("");
 
     pixels.show();
     delay(100); // FIXME this is in milliseconds, so the IMU updates every 10.  Getting this down would be nice.
@@ -125,7 +145,8 @@ uint8_t calculateSubpixel(const imu::Quaternion& p_pixel, const imu::Quaternion&
     imu::Vector<3> pixelProjection(p_pixel.x(), p_pixel.y(), p_pixel.z());
     imu::Vector<3> primaryProjection(p_subpixelPrimary.x(), p_subpixelPrimary.y(), p_subpixelPrimary.z());
 
-    return static_cast<uint8_t>(pixelProjection.dot(primaryProjection) / 2 + 255.0/2.0);
+    double rawSubpixel = pixelProjection.dot(primaryProjection) / 2 + 0.5;
+    return static_cast<uint8_t>(255.0 * rawSubpixel);
 }
 
 /**
@@ -154,7 +175,7 @@ void displayCalStatus(void)
     /* 3 means 'fully calibrated" */
     uint8_t system, gyro, accel, mag;
     system = gyro = accel = mag = 0;
-    bno055.getCalibration(&system, &gyro, &accel, &mag);
+    bno055->getCalibration(&system, &gyro, &accel, &mag);
 
     /* The data should be ignored until the system calibration is > 0 */
     Serial.print("\t");
