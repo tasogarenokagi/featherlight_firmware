@@ -50,9 +50,9 @@ const imu::Quaternion g_initialRGBPositions[3] =
     // Green
     imu::Quaternion(0.0, 0.0,  1.0, 0.0),
     // Red
-    imu::Quaternion(0.0, 0.0,  0.0, 1.0),
+    imu::Quaternion(0.0, 1.0,  0.0, 0.0),
     // Blue
-    imu::Quaternion(0.0, 1.0,  0.0, 0.0)
+    imu::Quaternion(0.0, 0.0,  0.0, 1.0)
 };
 
 /* Array index constants for the color primaries.
@@ -124,12 +124,11 @@ void loop()
         uint8_t blueSubpixel = 0;
         g_currentPixelPositions[i] = imuRotation * s_initialPixelPositions[i] * imuConjugate;
 
-        redSubpixel = calculateSubpixel(g_currentPixelPositions[i], g_initialRGBPositions[g_RED]);
+        redSubpixel = 0;//calculateSubpixel(g_currentPixelPositions[i], g_initialRGBPositions[g_RED]);
         greenSubpixel = calculateSubpixel(g_currentPixelPositions[i], g_initialRGBPositions[g_GREEN]);
-        blueSubpixel = calculateSubpixel(g_currentPixelPositions[i], g_initialRGBPositions[g_BLUE]);
+        blueSubpixel = calculateBlue(g_currentPixelPositions[i], g_initialRGBPositions[g_BLUE]);
 
         pixels.setPixelColor(i, redSubpixel, greenSubpixel, blueSubpixel);
-//        pixels.setPixelColor(15-i, redSubpixel, greenSubpixel, blueSubpixel);
     }
 
 //    debugQuaternion(imuRotation);
@@ -147,6 +146,17 @@ uint8_t calculateSubpixel(const imu::Quaternion& p_pixel, const imu::Quaternion&
 
     double rawSubpixel = pixelProjection.dot(primaryProjection) / 2 + 0.5;
     return static_cast<uint8_t>(255.0 * rawSubpixel);
+}
+
+uint8_t calculateBlue(const imu::Quaternion& p_pixel, const imu::Quaternion& p_subpixelPrimary)
+{
+    imu::Vector<3> pixelProjection(p_pixel.x(), p_pixel.y(), p_pixel.z());
+    imu::Vector<3> primaryProjection(p_subpixelPrimary.x(), p_subpixelPrimary.y(), p_subpixelPrimary.z());
+
+    double rawSubpixel = fabs(pixelProjection.dot(primaryProjection)) / 2;
+    uint8_t gammaCorrectedSubpixel = static_cast<uint8_t>(255.0 * pow(rawSubpixel, 1.5));
+    return gammaCorrectedSubpixel > 50 ? 50 : gammaCorrectedSubpixel;
+    //return static_cast<uint8_t>(255.0 * rawSubpixel);
 }
 
 /**
